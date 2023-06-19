@@ -16,8 +16,8 @@ export class HtmlParser {
         this.htmlSourceUrl = url.toString();
     }
 
-    toJson = function () {
-        axios.get(this.htmlSourceUrl).then((res) => {
+    toJson = async function () {
+        await axios.get(this.htmlSourceUrl).then((res) => {
             // main table body start & end
             let startIndex =
                 res.data.indexOf(tBodyStartTag) + tBodyStartTag.length;
