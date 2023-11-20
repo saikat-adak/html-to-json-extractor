@@ -8,7 +8,6 @@ const tBodyEndTag = "</tbody>";
 const trStartTag = "<tr>";
 const trEndTag = "</tr>";
 
-//https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/lines-33099-33199-eligible-medical-expenses-you-claim-on-your-tax-return.html
 export class HtmlParser {
     constructor(sourceUrl) {
         let url = new URL(sourceUrl);
@@ -16,48 +15,51 @@ export class HtmlParser {
         this.htmlSourceUrl = url.toString();
     }
 
-    toJson = async function () {
+    getTableAsJson = async function () {
         await axios.get(this.htmlSourceUrl).then((res) => {
-            // main table body start & end
+            // find main table body start & end
             let startIndex =
                 res.data.indexOf(tBodyStartTag) + tBodyStartTag.length;
             let endIndex = res.data.indexOf(tBodyEndTag);
+
+            //get only the main table as string
             let mainTable = res.data.substring(startIndex, endIndex);
 
-            let records = mainTable.split(trStartTag, recordsMaxNumber); // recordsMaxNumber will ensure that a huge table is not going to slow down the process
-            let medicalExpenses = [];
-            records.forEach((record) => {
-                if (record === "") return;
-                medicalExpenses.push(this.getMedicalExpense(record));
+            //split by <tr> tag and collect top n rows only where n is recordsMaxNumber
+            let rowCollection = mainTable.split(trStartTag, recordsMaxNumber); // recordsMaxNumber will ensure that a huge table is not going to slow down the process
+
+            //loop through the records and convert every row into a json object
+            let jsonArray = [];
+            rowCollection.forEach((row) => {
+                if (row === "") return;
+                jsonArray.push(this.getJsonObject(row));
             });
 
-            console.log(medicalExpenses);
-            return medicalExpenses;
-        });
+            console.log(jsonArray);
+            return jsonArray;
+        }).catch(error => console.error(error));
     };
 
-    getMedicalExpense = function (htmlRecord) {
+    //TODO: pass the column names as another parameter and use those as keys of the json object
+    getJsonObject = function (htmlRecord) {
         if (htmlRecord === "") return;
         let records = htmlRecord.split(tdStartTag);
-        let medicalExpense = {
-            expenseName: this.getHyperlinkText(this.extractPropertyValue(records[1])),
-            expenseDetailsUrl: this.getHyperlink(this.extractPropertyValue(records[1])),
-            isEligible:
-                this.extractPropertyValue(records[2]) === "Eligible" ? true : false,
+        let jsonObj = {
+            expenseName: this.getHyperlinkText(
+                this.extractPropertyValue(records[1])
+            ),
+            expenseDetailsUrl: this.getHyperlink(
+                this.extractPropertyValue(records[1])
+            ),
+            isEligible: this.extractPropertyValue(records[2]) === "Eligible",
             prescriptionNeeded:
-                this.extractPropertyValue(records[3]).toLowerCase() === "yes"
-                    ? true
-                    : false,
+                this.extractPropertyValue(records[3]).toLowerCase() === "yes",
             certificationNeeded:
-                this.extractPropertyValue(records[4]).toLowerCase() === "yes"
-                    ? true
-                    : false,
+                this.extractPropertyValue(records[4]).toLowerCase() === "yes",
             formT2201Needed:
-                this.extractPropertyValue(records[5]).toLowerCase() === "yes"
-                    ? true
-                    : false,
+                this.extractPropertyValue(records[5]).toLowerCase() === "yes",
         };
-        return medicalExpense;
+        return jsonObj;
     };
 
     extractPropertyValue = function (htmlRecord) {
